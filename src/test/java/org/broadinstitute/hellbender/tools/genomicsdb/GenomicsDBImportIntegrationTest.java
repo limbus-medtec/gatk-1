@@ -19,7 +19,7 @@ import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
-import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
+import org.broadinstitute.hellbender.utils.gcs.GoogleStorageUtils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.broadinstitute.hellbender.testutils.ArgumentsBuilder;
 import org.broadinstitute.hellbender.testutils.BaseTest;
@@ -348,7 +348,7 @@ public final class GenomicsDBImportIntegrationTest extends CommandLineProgramTes
     private static List<String> resolveLargeFilesAsCloudURIs(final List<String> filenames){
         return filenames.stream()
                 .map( filename -> filename.replace(publicTestDir, getGCPTestInputPath()))
-                .peek( filename -> Assert.assertTrue(BucketUtils.isCloudStorageUrl(filename)))
+                .peek( filename -> Assert.assertTrue(GoogleStorageUtils.isCloudStorageUrl(filename)))
                 .collect(Collectors.toList());
     }
 
@@ -824,7 +824,7 @@ public final class GenomicsDBImportIntegrationTest extends CommandLineProgramTes
             final String workspace, final String reference,
             final boolean produceGTField,
             final boolean sitesOnlyQuery) throws IOException {
-       String workspaceAbsPath = BucketUtils.makeFilePathAbsolute(workspace);
+       String workspaceAbsPath = IOUtils.makeFilePathAbsolute(workspace);
        GenomicsDBExportConfiguration.ExportConfiguration.Builder exportConfigurationBuilder = GenomicsDBExportConfiguration.ExportConfiguration.newBuilder()
                 .setWorkspace(workspace)
                 .setReferenceGenome(reference)
@@ -868,7 +868,7 @@ public final class GenomicsDBImportIntegrationTest extends CommandLineProgramTes
 
     @Test(groups = {"bucket"})
     public void testWriteToAndQueryFromGCS() throws IOException {
-        final String workspace = BucketUtils.randomRemotePath(getGCPTestStaging(), "", "") + "/";
+        final String workspace = GoogleStorageUtils.randomRemotePath(getGCPTestStaging(), "", "") + "/";
         IOUtils.deleteOnExit(IOUtils.getPath(workspace));
         writeToGenomicsDB(LOCAL_GVCFS, INTERVAL, workspace, 0, false, 0, 1);
         checkJSONFilesAreWritten(workspace);
@@ -877,7 +877,7 @@ public final class GenomicsDBImportIntegrationTest extends CommandLineProgramTes
 
     @Test(groups = {"bucket"}, expectedExceptions = GenomicsDBImport.UnableToCreateGenomicsDBWorkspace.class)
     public void testWriteToExistingGCSDirectory() throws IOException {
-        final String workspace = BucketUtils.randomRemotePath(getGCPTestStaging(), "", "") + "/";
+        final String workspace = GoogleStorageUtils.randomRemotePath(getGCPTestStaging(), "", "") + "/";
         IOUtils.deleteOnExit(IOUtils.getPath(workspace));
         int rc = GenomicsDBUtils.createTileDBWorkspace(workspace, false);
         Assert.assertEquals(rc, 0);

@@ -20,7 +20,7 @@ import org.bdgenomics.adam.models.SequenceDictionary;
 import org.bdgenomics.formats.avro.AlignmentRecord;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
-import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
+import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.read.GATKReadToBDGAlignmentRecordConverter;
 import org.broadinstitute.hellbender.utils.read.HeaderlessSAMRecordCoordinateComparator;
@@ -71,11 +71,11 @@ public final class ReadsSparkSink {
             final JavaSparkContext ctx, final String outputFile, final String referenceFile, final JavaRDD<GATKRead> reads,
             final SAMFileHeader header, ReadsWriteFormat format, final int numReducers, final String outputPartsDir) throws IOException {
 
-        String absoluteOutputFile = BucketUtils.makeFilePathAbsolute(outputFile);
+        String absoluteOutputFile = IOUtils.makeFilePathAbsolute(outputFile);
         String absoluteReferenceFile = referenceFile != null ?
-                                        BucketUtils.makeFilePathAbsolute(referenceFile) :
+                                        IOUtils.makeFilePathAbsolute(referenceFile) :
                                         referenceFile;
-      ReadsSparkSource.checkCramReference(ctx, absoluteOutputFile, absoluteReferenceFile);
+        ReadsSparkSource.checkCramReference(ctx, absoluteOutputFile, absoluteReferenceFile);
 
         // The underlying reads are required to be in SAMRecord format in order to be
         // written out, so we convert them to SAMRecord explicitly here. If they're already

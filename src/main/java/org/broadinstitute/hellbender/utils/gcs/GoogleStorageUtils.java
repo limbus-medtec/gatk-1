@@ -18,7 +18,6 @@ import shaded.cloud_nio.com.google.auth.oauth2.GoogleCredentials;
 import shaded.cloud_nio.org.threeten.bp.Duration;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Path;
@@ -28,16 +27,12 @@ import java.util.UUID;
 /**
  * Utilities for dealing with google buckets.
  */
-public final class BucketUtils {
+public final class GoogleStorageUtils {
     public static final String GCS_PREFIX = "gs://";
-    public static final String HDFS_PREFIX = "hdfs://";
-
-    // slashes omitted since hdfs paths seem to only have 1 slash which would be weirder to include than no slashes
-    public static final String FILE_PREFIX = "file:";
 
     public static final Logger logger = LogManager.getLogger("org.broadinstitute.hellbender.utils.gcs");
 
-    private BucketUtils(){} //private so that no one will instantiate this class
+    private GoogleStorageUtils(){} //private so that no one will instantiate this class
 
     public static boolean isCloudStorageUrl(final String path) {
         Utils.nonNull(path);
@@ -47,33 +42,6 @@ public final class BucketUtils {
     public static boolean isCloudStorageUrl(final Path path) {
         // the initial "" protects us against a null scheme
         return ("" + path.toUri().getScheme() + "://").equals(GCS_PREFIX);
-    }
-
-    /**
-     * Returns true if the given path is a HDFS (Hadoop filesystem) URL.
-     */
-    public static boolean isHadoopUrl(String path) {
-        return path.startsWith(HDFS_PREFIX);
-    }
-
-    /**
-     * Returns true if the given path is a GCS or HDFS (Hadoop filesystem) URL.
-     */
-    public static boolean isRemoteStorageUrl(String path) {
-        return isCloudStorageUrl(path) || isHadoopUrl(path);
-    }
-
-    /**
-     * Changes relative local file paths to be absolute file paths. Paths with a scheme are left unchanged.
-     * @param path the path
-     * @return an absolute file path if the original path was a relative file path, otherwise the original path
-     */
-    public static String makeFilePathAbsolute(String path){
-        if (isCloudStorageUrl(path) || isHadoopUrl(path) || isFileUrl(path)){
-            return path;
-        } else {
-            return new File(path).getAbsolutePath();
-        }
     }
 
     /**
@@ -88,7 +56,7 @@ public final class BucketUtils {
      *
      */
     public static String getTempFilePath(String prefix, String extension){
-        if (isCloudStorageUrl(prefix) || (isHadoopUrl(prefix))){
+        if (isCloudStorageUrl(prefix) || (IOUtils.isHadoopUrl(prefix))){
             final String path = randomRemotePath(prefix, "", extension);
             IOUtils.deleteOnExit(IOUtils.getPath(path));
             IOUtils.deleteOnExit(IOUtils.getPath(path + Tribble.STANDARD_INDEX_EXTENSION));
@@ -113,15 +81,11 @@ public final class BucketUtils {
         if (isCloudStorageUrl(stagingLocation)) {
             // Go through URI because Path.toString isn't guaranteed to include the "gs://" prefix.
             return getPathOnGcs(stagingLocation).resolve(prefix + UUID.randomUUID().toString() + suffix).toUri().toString();
-        } else if (isHadoopUrl(stagingLocation)) {
+        } else if (IOUtils.isHadoopUrl(stagingLocation)) {
             return new org.apache.hadoop.fs.Path(stagingLocation, prefix + UUID.randomUUID().toString() + suffix).toString();
         } else {
             throw new IllegalArgumentException("Staging location is not remote: " + stagingLocation);
         }
-    }
-
-    public static boolean isFileUrl(String path) {
-        return path.startsWith(FILE_PREFIX);
     }
 
     /**

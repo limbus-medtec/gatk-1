@@ -21,7 +21,7 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.GetSampleName;
 import org.broadinstitute.hellbender.utils.Utils;
-import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
+import org.broadinstitute.hellbender.utils.gcs.GoogleStorageUtils;
 import org.broadinstitute.hellbender.utils.runtime.ProcessController;
 import org.broadinstitute.hellbender.utils.runtime.ProcessOutput;
 import org.broadinstitute.hellbender.utils.runtime.ProcessSettings;
@@ -44,6 +44,9 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipException;
 
 public final class IOUtils {
+    public static final String HDFS_PREFIX = "hdfs://";
+    // slashes omitted since hdfs paths seem to only have 1 slash which would be weirder to include than no slashes
+    public static final String FILE_PREFIX = "file:";
     private static final Logger logger = LogManager.getLogger(IOUtils.class);
     private static final File DEV_DIR = new File("/dev");
 
@@ -750,7 +753,7 @@ public final class IOUtils {
         try {
             // special case GCS, in case the filesystem provider wasn't installed properly but is available.
             if (CloudStorageFileSystem.URI_SCHEME.equals(uri.getScheme())) {
-                return BucketUtils.getPathOnGcs(uriString);
+                return GoogleStorageUtils.getPathOnGcs(uriString);
             }
             return uri.getScheme() == null ? Paths.get(uriString) : Paths.get(uri);
         } catch (FileSystemNotFoundException e) {
@@ -781,7 +784,7 @@ public final class IOUtils {
         if (path.startsWith("/")) { // Already an absolute path
             return path;
         }
-        if (BucketUtils.isRemoteStorageUrl(dir) || BucketUtils.isFileUrl(dir)) {
+        if (GoogleStorageUtils.isCloudStorageUrl(dir) || isHadoopUrl(dir) || hasFileScheme(dir)) {
             Path dirPath = getPath(dir);
             return dirPath.resolve(path).toUri().toString();
         } else {
@@ -1058,5 +1061,29 @@ public final class IOUtils {
         } catch (RuntimeException | IOException e) {
             throw new UserException("Failed to determine total input size of " + path + "\n Caused by:" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Returns true if the given path is a HDFS (Hadoop filesystem) URL.
+     */
+    public static boolean isHadoopUrl(String path) {
+        return path.startsWith(HDFS_PREFIX);
+    }
+
+    /**
+     * Changes relative local file paths to be absolute file paths. Paths with a scheme are left unchanged.
+     * @param path the path
+     * @return an absolute file path if the original path was a relative file path, otherwise the original path
+     */
+    public static String makeFilePathAbsolute(String path){
+        if (GoogleStorageUtils.isCloudStorageUrl(path) || isHadoopUrl(path) || hasFileScheme(path)){
+            return path;
+        } else {
+            return new File(path).getAbsolutePath();
+        }
+    }
+    
+    private static boolean hasFileScheme(String path) {
+        return path.startsWith(FILE_PREFIX);
     }
 }
