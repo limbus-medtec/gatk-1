@@ -117,7 +117,7 @@ import java.util.List;
  *
  * <h3>Caveats</h3>
  * <p>
- *     Although GATK4 Mutect2 accomodates varying coverage depths, further optimization of parameters
+ *     Although GATK4 Mutect2 accommodates varying coverage depths, further optimization of parameters
  *     may improve calling for extreme high depths, e.g. 1000X.
  * </p>
  */
