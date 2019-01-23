@@ -222,6 +222,45 @@ workflow Mutect2 {
                 disk_space = tumor_bam_size + normal_bam_size + ref_size + gnomad_vcf_size + m2_output_size + disk_pad
         }
 
+        if (defined(variants_for_contamination)) {
+            call GetPileupSummaries as TumorPileups {
+                input:
+                    gatk_override = gatk_override,
+                    intervals = subintervals,
+                    ref_fasta = ref_fasta,
+                    ref_fai = ref_fai,
+                    ref_dict = ref_dict,
+                    preemptible_attempts = preemptible_attempts,
+                    max_retries = max_retries,
+                    gatk_docker = gatk_docker,
+                    bam = tumor_bam,
+                    bai = tumor_bai,
+                    variants_for_contamination = variants_for_contamination,
+                    variants_for_contamination_index = variants_for_contamination_index,
+                    disk_space = tumor_bam_size + ceil(size(variants_for_contamination, "GB") * small_input_to_output_multiplier) + disk_pad
+            }
+
+            if (defined(normal_bam)){
+                call GetPileupSummaries as NormalPileups {
+                    input:
+                        gatk_override = gatk_override,
+                        intervals = subintervals,
+                        ref_fasta = ref_fasta,
+                        ref_fai = ref_fai,
+                        ref_dict = ref_dict,
+                        preemptible_attempts = preemptible_attempts,
+                        max_retries = max_retries,
+                        gatk_docker = gatk_docker,
+                        bam = normal_bam,
+                        bai = normal_bai,
+                        variants_for_contamination = variants_for_contamination,
+                        variants_for_contamination_index = variants_for_contamination_index,
+                        disk_space = normal_bam_size + ceil(size(variants_for_contamination, "GB") * small_input_to_output_multiplier) + disk_pad
+
+                }
+            }
+        }
+
         Float sub_vcf_size = size(M2.unfiltered_vcf, "GB")
         Float sub_bamout_size = size(M2.output_bamOut, "GB")
     }
@@ -313,6 +352,32 @@ workflow Mutect2 {
     }
 
     if (defined(variants_for_contamination)) {
+        call MergePileupSummaries as MergeTumorPileups {
+            input:
+                input_tables = TumorPileups.pileups,
+                output_name = output_basename,
+                ref_dict = ref_dict,
+                gatk_override = gatk_override,
+                gatk_docker = gatk_docker,
+                preemptible_attempts = preemptible_attempts,
+                max_retries = max_retries,
+                disk_space = ceil(SumSubVcfs.total_size * large_input_to_output_multiplier) + disk_pad
+        }
+
+        if (defined(normal_bam)){
+            call MergePileupSummaries as MergeNormalPileups {
+                input:
+                    input_tables = NormalPileups.pileups,
+                    output_name = output_basename,
+                    ref_dict = ref_dict,
+                    gatk_override = gatk_override,
+                    gatk_docker = gatk_docker,
+                    preemptible_attempts = preemptible_attempts,
+                    max_retries = max_retries,
+                    disk_space = ceil(SumSubVcfs.total_size * large_input_to_output_multiplier) + disk_pad
+            }
+        }
+
         call CalculateContamination {
             input:
                 gatk_override = gatk_override,
@@ -323,10 +388,8 @@ workflow Mutect2 {
                 preemptible_attempts = preemptible_attempts,
                 max_retries = max_retries,
                 gatk_docker = gatk_docker,
-                tumor_bam = tumor_bam,
-                tumor_bai = tumor_bai,
-                normal_bam = normal_bam,
-                normal_bai = normal_bai,
+                tumor_pileups = MergeTumorPileups.merged_table,
+                normal_pileups = MergeNormalPileups.merged_table,
                 variants_for_contamination = variants_for_contamination,
                 variants_for_contamination_index = variants_for_contamination_index,
                 disk_space = tumor_bam_size + normal_bam_size + ceil(size(variants_for_contamination, "GB") * small_input_to_output_multiplier) + disk_pad
@@ -450,6 +513,7 @@ workflow Mutect2 {
         File? bamout = MergeBamOuts.merged_bam_out
         File? bamout_index = MergeBamOuts.merged_bam_out_index
         File? maf_segments = CalculateContamination.maf_segments
+        File? read_orientation_model_params = LearnReadOrientationModel.artifact_prior_table
     }
 }
 
@@ -700,6 +764,99 @@ task MergeBamOuts {
     }
 }
 
+task GetPileupSummaries {
+    # inputs
+    File? intervals
+    File ref_fasta
+    File ref_fai
+    File ref_dict
+    File bam
+    File bai
+    File? variants_for_contamination
+    File? variants_for_contamination_index
+
+    File? gatk_override
+
+    # runtime
+    Int? preemptible_attempts
+    Int? max_retries
+    String gatk_docker
+    Int? disk_space
+    Int? mem
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem) then mem * 1000 else 3000
+    Int command_mem = machine_mem - 500
+
+    command {
+        set -e
+
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
+
+        gatk --java-options "-Xmx${command_mem}m" GetPileupSummaries -R ${ref_fasta} -I ${bam} ${"--interval-set-rule INTERSECTION -L " + intervals} \
+            -V ${variants_for_contamination} -L ${variants_for_contamination} -O pileups.table
+    }
+
+    runtime {
+        docker: gatk_docker
+        bootDiskSizeGb: 12
+        memory: command_mem + " MB"
+        disks: "local-disk " + select_first([disk_space, 100]) + " HDD"
+        preemptible: select_first([preemptible_attempts, 10])
+        maxRetries: select_first([max_retries, 3])
+    }
+
+    output {
+        File pileups = "pileups.table"
+    }
+
+}
+
+task MergePileupSummaries {
+    # input_tables needs to be optional because GetPileupSummaries is in an if-block
+    Array[File?] input_tables
+    String output_name
+    File? gatk_override
+    File ref_dict
+
+    # runtime
+    String gatk_docker
+    Int? mem
+    Int? preemptible_attempts
+    Int? max_retries
+    Int? disk_space
+    Int? cpu
+    Boolean use_ssd = false
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem) then mem * 1000 else 3500
+    Int command_mem = machine_mem - 1000
+
+    command {
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
+
+        gatk --java-options "-Xmx${command_mem}m" GatherPileupSummaries \
+        --sequence-dictionary ${ref_dict} \
+        -I ${sep=' -I ' input_tables} \
+        -O ${output_name}.tsv
+    }
+
+    runtime {
+        docker: gatk_docker
+        bootDiskSizeGb: 12
+        memory: machine_mem + " MB"
+        disks: "local-disk " + select_first([disk_space, 100]) + if use_ssd then " SSD" else " HDD"
+        preemptible: select_first([preemptible_attempts, 10])
+        maxRetries: select_first([max_retries, 3])
+        cpu: select_first([cpu, 1])
+    }
+
+    output {
+        File merged_table = "${output_name}.tsv"
+    }    
+}
+
 task CollectSequencingArtifactMetrics {
     # inputs
     File ref_fasta
@@ -860,10 +1017,8 @@ task CalculateContamination {
     File ref_fasta
     File ref_fai
     File ref_dict
-    File tumor_bam
-    File tumor_bai
-    File? normal_bam
-    File? normal_bai
+    File tumor_pileups
+    File? normal_pileups
     File? variants_for_contamination
     File? variants_for_contamination_index
 
@@ -885,16 +1040,9 @@ task CalculateContamination {
 
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
 
-        if [[ -f "${normal_bam}" ]]; then
-            gatk --java-options "-Xmx${command_mem}m" GetPileupSummaries -I ${normal_bam} ${"--interval-set-rule INTERSECTION -L " + intervals} \
-                -V ${variants_for_contamination} -L ${variants_for_contamination} -O normal_pileups.table
-            NORMAL_CMD="-matched normal_pileups.table"
-        fi
-
-        gatk --java-options "-Xmx${command_mem}m" GetPileupSummaries -R ${ref_fasta} -I ${tumor_bam} ${"--interval-set-rule INTERSECTION -L " + intervals} \
-            -V ${variants_for_contamination} -L ${variants_for_contamination} -O pileups.table
-        gatk --java-options "-Xmx${command_mem}m" CalculateContamination -I pileups.table -O contamination.table --tumor-segmentation segments.table $NORMAL_CMD
-    }
+        gatk --java-options "-Xmx${command_mem}m" CalculateContamination -I ${tumor_pileups} \
+        -O contamination.table --tumor-segmentation segments.table ${"-matched " + normal_pileups}
+    }       
 
     runtime {
         docker: gatk_docker
@@ -906,7 +1054,6 @@ task CalculateContamination {
     }
 
     output {
-        File pileups = "pileups.table"
         File contamination_table = "contamination.table"
         File maf_segments = "segments.table"
     }
