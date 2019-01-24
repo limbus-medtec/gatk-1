@@ -20,9 +20,9 @@ public class PathSpecifierUnitTest {
     public Object[][] validPathSpecifiers() {
         return new Object[][] {
                 // Paths specifiers that ar syntactically valid as either a file name or a URI and can be
-                // represented internally as a URI, but which may fail isNIO or isPath
+                // represented internally as a URI, but which may fail hasFileSystemProvider or isPath
 
-                // input String, expected resulting URI String, expected isNIO, expected isPath
+                // input String, expected resulting URI String, expected hasFileSystemProvider, expected isPath
 
                 //********************************
                 // Local (non-URI) file references
@@ -115,20 +115,20 @@ public class PathSpecifierUnitTest {
     }
 
     @Test(dataProvider = "validPathSpecifiers")
-    public void testPathSpecifier(final String referenceString, final String expectedURIString, final boolean isNIO, final boolean isPath) {
+    public void testPathSpecifier(final String referenceString, final String expectedURIString, final boolean hasFileSystemProvider, final boolean isPath) {
         final PathURI pathURI = new PathSpecifier(referenceString);
         Assert.assertNotNull(pathURI);
         Assert.assertEquals(pathURI.getURI().toString(), expectedURIString);
     }
 
     @Test(dataProvider = "validPathSpecifiers")
-    public void testIsNIO(final String referenceString, final String expectedURIString, final boolean isNIO, final boolean isPath) {
+    public void testIsNIO(final String referenceString, final String expectedURIString, final boolean hasFileSystemProvider, final boolean isPath) {
         final PathURI pathURI = new PathSpecifier(referenceString);
-        Assert.assertEquals(pathURI.isNIO(), isNIO);
+        Assert.assertEquals(pathURI.hasFileSystemProvider(), hasFileSystemProvider);
     }
 
     @Test(dataProvider = "validPathSpecifiers")
-    public void testIsPath(final String referenceString, final String expectedURIString, final boolean isNIO, final boolean isPath) {
+    public void testIsPath(final String referenceString, final String expectedURIString, final boolean hasFileSystemProvider, final boolean isPath) {
         final PathURI pathURI = new PathSpecifier(referenceString);
         if (isPath) {
             Assert.assertEquals(pathURI.isPath(), isPath, pathURI.getToPathFailureReason());
@@ -138,7 +138,7 @@ public class PathSpecifierUnitTest {
     }
 
     @Test(dataProvider = "validPathSpecifiers")
-    public void testToPath(final String referenceString, final String expectedURIString, final boolean isNIO, final boolean isPath) {
+    public void testToPath(final String referenceString, final String expectedURIString, final boolean hasFileSystemProvider, final boolean isPath) {
         final PathURI pathURI = new PathSpecifier(referenceString);
         if (isPath) {
             final Path path = pathURI.toPath();

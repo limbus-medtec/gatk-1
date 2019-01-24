@@ -29,17 +29,18 @@ public interface PathURI {
     String getRawInputString();
 
     /**
-     * @return true if this URI has a scheme that has an installed {@code java.nio} file system provider. This does not
+     * @return true if this URI has a scheme that has an installed {@code java.nio} file system provider
+     * ({@linktourl https://docs.oracle.com/javase/8/docs/api/java/nio/file/spi/FileSystemProvider.html}). This does not
      * guarantee the URI can be converted into a {@code java.nio.file.Path}, since the URI can be syntactically
      * valid, and specify a valid file system provider, but still fail to be semantically meaningful.
      */
-    boolean isNIO();
+    boolean hasFileSystemProvider();
 
     /**
-     * Return true if this {code PathURI} can be resolved to an NIO Path. If true, {@code #toPath()} can be
+     * Return true if this {code PathURI} can be resolved to an {@code java.nio} Path. If true, {@code #toPath()} can be
      * safely called.
      *
-     * There are cases where a valid URI with a valid scheme backed by an installed NIO File System
+     * There are cases where a valid URI with a valid scheme backed by an installed {@code java.nio File System
      * still can't be turned into a {@code java.nio.file.Path}, i.e., the following specifies an invalid
      * authority "namenode":
      *

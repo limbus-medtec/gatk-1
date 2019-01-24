@@ -30,8 +30,8 @@ import java.nio.file.spi.FileSystemProvider;
  *
  * 1) PathSpecifier constructor: requires a syntactically valid URI, possibly containing a scheme (if no scheme
  *    is present the path part will be escaped/encoded), or a valid local file reference
- * 2) isNio: true if the input string is an identifier that is syntactically valid, and is backed by
- *    an installed NIO provider that matches the URI scheme
+ * 2) hasFileSystemProvider: true if the input string is an identifier that is syntactically valid, and is backed by
+ *    an installed {@code java.nio} file system provider that matches the URI scheme
  * 3) isPath: syntactically valid URI that can be resolved to a java.io.Path by the associated provider
  *
  * Definitions taken from RFC 2396 "Uniform Resource Identifiers (URI): Generic Syntax"
@@ -135,7 +135,7 @@ public class PathSpecifier implements PathURI, Serializable {
     public String getRawInputString() { return rawInputString; }
 
     @Override
-    public boolean isNIO() {
+    public boolean hasFileSystemProvider() {
         // try to find a provider; assume that our URI always has a scheme
         for (FileSystemProvider provider: FileSystemProvider.installedProviders()) {
             if (provider.getScheme().equalsIgnoreCase(uri.getScheme())) {
