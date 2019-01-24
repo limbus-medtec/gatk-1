@@ -22,14 +22,13 @@ import java.util.Objects;
 public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, Serializable {
     private static final long serialVersionUID = 1L;
 
-    public static final String GCS_SCHEME = "gs";
     public static final String HDFS_SCHEME = "hdfs";
 
     private String tagName;
     private Map<String, String> tagAttributes;
 
     /**
-     * The raw value for this specifier as provided by the user. Can ba a local file or valid URI.
+     * The raw value for this specifier as provided by the user. Can be a local file or valid URI.
      * @param uriString
      */
     public GATKPathSpecifier(final String uriString) {
@@ -48,7 +47,6 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
         }
     }
 
-    //TODO: should this wrap the stream in a .gz in a BlockCompressedInputStream like IOUtils does?
     @Override
     public InputStream getInputStream() {
         if (!isPath()) {
@@ -57,10 +55,7 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
 
         try {
             InputStream inputStream;
-            if (getURI().getScheme().equals(GCS_SCHEME)) {
-                Path p = BucketUtils.getPathOnGcs(getURIString());
-                inputStream = Files.newInputStream(p);
-            } else if (getURI().getScheme().equals(HDFS_SCHEME)) {
+            if (getURI().getScheme().equals(HDFS_SCHEME)) {
                 org.apache.hadoop.fs.Path file = new org.apache.hadoop.fs.Path(getURIString());
                 org.apache.hadoop.fs.FileSystem fs = file.getFileSystem(new org.apache.hadoop.conf.Configuration());
                 inputStream = fs.open(file);
@@ -68,7 +63,6 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
                 inputStream = super.getInputStream();
             }
 
-            //TODO: should this wrap the stream in a .gz in a BlockCompressedInputStream ?
             return inputStream;
         } catch (IOException e) {
             throw new UserException.CouldNotReadInputFile(getRawInputString(), e);
@@ -89,10 +83,7 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
 
         try {
             OutputStream outputStream;
-            if (getURI().getScheme().equals(GCS_SCHEME)) {
-                Path p = BucketUtils.getPathOnGcs(getURIString());
-                outputStream = Files.newOutputStream(p);
-            } else if (getURI().getScheme().equals(HDFS_SCHEME)) {
+            if (getURI().getScheme().equals(HDFS_SCHEME)) {
                 org.apache.hadoop.fs.Path fsPath = new org.apache.hadoop.fs.Path(getURIString());
                 org.apache.hadoop.fs.FileSystem fs = fsPath.getFileSystem(new org.apache.hadoop.conf.Configuration());
                 return fs.create(fsPath);
@@ -100,7 +91,6 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
                 outputStream = super.getOutputStream();
             }
 
-            //TODO: should this wrap the stream in a .gz in a BlockCompressedOutputStream ?
             return outputStream;
         } catch (IOException e) {
             throw new UserException.CouldNotCreateOutputFile(getRawInputString(), e);
@@ -136,16 +126,27 @@ public class GATKPathSpecifier extends PathSpecifier implements TaggedArgument, 
         }
     }
 
+    /**
+     * Return true if the tag name and attributes for two {@code TaggedArgument} objects are the equal. For use
+     * by TaggedArgument implementations. Canbe replaced with the Barclay version once
+     * https://github.com/broadinstitute/barclay/pull/152 is in.
+     *
+     * @param first first {@code TaggedArgument} to compare
+     * @param second second {@code TaggedArgument}
+     * @return true if the tag name and attributes are equal
+     */
+    static boolean tagNameAndAttributesAreEqual(final TaggedArgument first, final TaggedArgument second) {
+        return Objects.equals(first.getTag(), second.getTag()) &&
+                Objects.equals(first.getTagAttributes(), second.getTagAttributes());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof GATKPathSpecifier)) return false;
         if (!super.equals(o)) return false;
 
-        GATKPathSpecifier GATKPathSpecifier = (GATKPathSpecifier) o;
-
-        if (!Objects.equals(tagName, GATKPathSpecifier.tagName)) return false;
-        return Objects.equals(getTagAttributes(), GATKPathSpecifier.getTagAttributes());
+        return tagNameAndAttributesAreEqual(this, (GATKPathSpecifier) o);
     }
 
     @Override

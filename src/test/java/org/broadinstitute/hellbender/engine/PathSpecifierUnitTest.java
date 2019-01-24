@@ -5,6 +5,7 @@ import com.google.common.jimfs.Jimfs;
 import org.apache.commons.lang3.SystemUtils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -98,7 +99,7 @@ public class PathSpecifierUnitTest {
 
                 //*****************************************************************************************
                 // Reference that contain characters that require URI-encoding. If the input string is presented
-                // without no scheme, it will be be automatically encoded by PathSpecifier, otherwise it
+                // with no scheme, it will be be automatically encoded by PathSpecifier, otherwise it
                 // must already be URI-encoded.
                 //*****************************************************************************************
 
@@ -272,13 +273,15 @@ public class PathSpecifierUnitTest {
 
     @Test
     public void testStdOut() throws IOException {
-        final PathURI pathURI = new PathSpecifier(
-                SystemUtils.IS_OS_WINDOWS ?
-                        "-" :
-                        "/dev/stdout");
-        try (final OutputStream os = pathURI.getOutputStream();
-             final DataOutputStream dos = new DataOutputStream(os)) {
-            dos.write("some stuff".getBytes());
+        if (SystemUtils.IS_OS_WINDOWS) {
+            // stdout is not addressable as a device in the file system namespace on Windows, so skip
+            throw new SkipException(("No stdout test on Windows"));
+        } else {
+            final PathURI pathURI = new PathSpecifier("/dev/stdout");
+            try (final OutputStream os = pathURI.getOutputStream();
+                 final DataOutputStream dos = new DataOutputStream(os)) {
+                dos.write("some stuff".getBytes());
+            }
         }
     }
 

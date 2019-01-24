@@ -34,7 +34,8 @@ import java.nio.file.spi.FileSystemProvider;
  *    an installed NIO provider that matches the URI scheme
  * 3) isPath: syntactically valid URI that can be resolved to a java.io.Path by the associated provider
  *
- * Definitions:
+ * Definitions taken from RFC 2396 "Uniform Resource Identifiers (URI): Generic Syntax"
+ * (https://www.ietf.org/rfc/rfc2396.txt):
  *
  * "absolute" URI  - specifies a scheme
  * "relative" URI  - does not specify a scheme
@@ -67,7 +68,7 @@ public class PathSpecifier implements PathURI, Serializable {
 
     private final String    rawInputString;     // raw input string provided by th user; may or may not have a scheme
     private final URI       uri;                // working URI; always has a scheme (assume "file" if not provided)
-    private String          pathFailureReason;  // cache the reason for "toPath" conversion failure
+    private transient String pathFailureReason; // cache the reason for "toPath" conversion failure
     private transient Path  cachedPath;         // cache the Path associated with this URI if its "Path-able"
 
     /**
@@ -244,14 +245,14 @@ public class PathSpecifier implements PathURI, Serializable {
 
         PathSpecifier that = (PathSpecifier) o;
 
-        if (!getURIString().equals(that.getURIString())) return false;
+        if (!getRawInputString().equals(that.getRawInputString())) return false;
         if (!getURI().equals(that.getURI())) return false;
         return true;
     }
 
     @Override
     public int hashCode() {
-        int result = getURIString().hashCode();
+        int result = getRawInputString().hashCode();
         result = 31 * result + getURI().hashCode();
         return result;
     }

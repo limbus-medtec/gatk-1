@@ -8,7 +8,6 @@ import org.broadinstitute.hellbender.utils.io.IOUtils;
 
 import java.io.File;
 import java.io.Serializable;
-import java.net.URI;
 import java.util.*;
 
 /**
@@ -45,7 +44,6 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
     /**
      * File containing Features as specified by the user on the command line
      */
-    private final String rawInputSpecifier;
 
     /**
      * Cache the codec for this feature input the first time we discover it, so we only do it once
@@ -71,7 +69,6 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
     FeatureInput(final String rawArgumentValue) {
         super(rawArgumentValue);
         Utils.nonNull(rawArgumentValue, "rawArgumentValue");
-        this.rawInputSpecifier = rawArgumentValue;
     }
 
     /**
@@ -100,7 +97,6 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
 
         setTag(name);
         setTagAttributes(keyValueMap);
-        this.rawInputSpecifier = rawInputSpecifier;
     }
 
     /**
@@ -166,7 +162,7 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
      */
     //TODO: this should go away; most consumers of this method assume this is a path to a File;
     public String getFeaturePath() {
-        return rawInputSpecifier;
+        return getRawInputString();
     }
 
     /**
@@ -176,7 +172,7 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
      */
     @Override
     public int hashCode() {
-        return super.hashCode() + 31 * rawInputSpecifier.hashCode();
+        return super.hashCode() + 31 * getRawInputString().hashCode();
     }
 
     /**
@@ -192,11 +188,8 @@ public final class FeatureInput<T extends Feature> extends GATKPathSpecifier imp
         }
 
         final FeatureInput<?> otherFeature = (FeatureInput<?>)other;
-        if (!Objects.equals(getTag(), otherFeature.getTag())) {
-            return false;
-        }
-
-        return rawInputSpecifier.equals(otherFeature.rawInputSpecifier);
+        return super.equals(otherFeature) &&
+                Objects.equals(getRawInputString(), otherFeature.getRawInputString());
     }
 
     /**

@@ -29,7 +29,7 @@ public interface PathURI {
     String getRawInputString();
 
     /**
-     * @return true if this URI has a scheme that has an installed NIO file system provider. This does not
+     * @return true if this URI has a scheme that has an installed {@code java.nio} file system provider. This does not
      * guarantee the URI can be converted into a {@code java.nio.file.Path}, since the URI can be syntactically
      * valid, and specify a valid file system provider, but still fail to be semantically meaningful.
      */
